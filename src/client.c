@@ -15,12 +15,7 @@ enum {
 typedef struct {
     u32 model;
     u32 health;
-
     b32 alive;
-
-    // zplm_vec3_t direction;
-    // zplm_vec3_t speed;
-
 } librg_component(gamedata);
 
 #define MY_SERVER_SECRET 23788787283782378

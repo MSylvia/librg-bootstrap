@@ -14,12 +14,7 @@ enum {
 typedef struct {
     u32 model;
     u32 health;
-
     b32 alive;
-
-    // zplm_vec3_t direction;
-    // zplm_vec3_t speed;
-
 } librg_component(gamedata);
 
 #define MY_SERVER_SECRET 23788787283782378
@@ -54,9 +49,6 @@ void on_connect_accepted(librg_event_t *event) {
     gamedata->model     = 552;
     gamedata->health    = 1000;
     gamedata->alive     = true;
-
-    // gamedata->direction = zplm_vec3(0.0f, 0.0f, 0.0f);
-    // gamedata->speed     = zplm_vec3(0.0f, 0.0f, 0.0f);
 
     // set the position
     transform->position = zplm_vec3(0.0f, 0.0f, 0.0f);

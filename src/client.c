@@ -1,79 +1,142 @@
-#define LIBRG_IMPLEMENTATION
 #define LIBRG_DEBUG
+#define LIBRG_IMPLEMENTATION
 #include <librg.h>
 
-typedef struct { i32 a; } librg_component(foo);
+enum {
+    ON_KILL_SERVER = LIBRG_LAST_ENUM_NUMBER, // we are counting from N events +1
+    ON_OTHER_MSG_1,
+    ON_OTHER_MSG_2,
+};
 
-void on_connect_request(librg_event_t *event) {
-    librg_data_wu32(&event->data, 42);
-    librg_log("on_connect_request\n");
+/**
+ * This sturcture defines our nice component
+ * (same as on the server)
+ */
+typedef struct {
+    u32 model;
+    u32 health;
+
+    b32 alive;
+
+    // zplm_vec3_t direction;
+    // zplm_vec3_t speed;
+
+} librg_component(gamedata);
+
+#define MY_SERVER_SECRET 23788787283782378
+static b32 client_running;
+
+librg_entity_t local_player;
+
+/**
+ * As a client we gonna send secret to connect
+ * to the server
+ */
+void on_connection_request(librg_event_t *event) {
+    librg_data_wu64(&event->data, MY_SERVER_SECRET);
 }
 
 void on_connect_accepted(librg_event_t *event) {
-    librg_log("on_connect_accepted\n");
+    librg_attach_gamedata(event->entity, (gamedata_t){0});
+    local_player = event->entity; // save our local player
 }
 
-void on_connect_refused(librg_event_t *event) {
-    librg_log("on_connect_refused\n");
+/**
+ * Will be called when we are getting
+ * new created entity in the zone
+ *
+ * NOTE: it will not be our entity
+ */
+void on_entity_create(librg_event_t *event) {
+    zplm_vec3_t position = librg_fetch_transform(event->entity)->position;
+
+    // call to ingame method of creating object
+    librg_log("creating entity with id: %u, of type: %u, on position: %f %f %f \n",
+        event->entity, librg_entity_type(event->entity),
+        position.x, position.y, position.z
+    );
+
+    // now read and attach server's gamedata about entity
+    gamedata_t gamedata;
+    librg_data_rptr(&event->data, &gamedata, sizeof(gamedata_t));
+    librg_attach_gamedata(event->entity, gamedata);
 }
 
-// // client
-// void damage_car(librg_entity_t entity) {
-//     librg_log("client: damanging the car\n");
-//     librg_send(21, librg_lambda(data), { librg_data_wentity(&data, entity); });
-// }
+/**
+ * Will be called when we are getting
+ * updates about entity inside the stream zone
+ */
+void on_entity_update(librg_event_t *event) {
+    zplm_vec3_t position = librg_fetch_transform(event->entity)->position;
 
-// void onvehcielcreate(librg_message_t *msg) {
-//     u32 guid = librg_data_ru32(&msg->data);
+    // call to ingame method of updating object
+    librg_log("updating position for entity with id: %u, of type: %u, to position: %f %f %f \n",
+        event->entity, librg_entity_type(event->entity),
+        position.x, position.y, position.z
+    );
 
-//     librg_entity_t entity = librg_entity_create_shared(guid, 0);
-//     librg_attach_foo(entity, (foo_t) { 123 });
+    // read helth server sent us
+    u32 new_health = librg_data_ru32(&event->data);
 
-//     librg_log("server created vehicle %lu\n", entity.id);
+    // and assign it into our gamedata, if it's attached
+    gamedata_t *gamedata = librg_fetch_gamedata(event->entity);
 
-//     damage_car(entity);
-// }
+    if (gamedata) {
+        gamedata->health = new_health;
+    }
+}
 
-// void on_damage_finished(librg_message_t *msg) {
-//     u32 guid = librg_data_ru32(&msg->data);
-//     librg_entity_t entity = librg_entity_get(guid);
+void on_entity_remove(librg_event_t *event) {
+    // call to ingame method of destroying object
+    librg_log("destroying entity with id: %u\n", event->entity);
+}
 
-//     foo_t *foo = librg_fetch_foo(entity);
+void game_tick() {
+    if (librg_entity_valid(local_player) && librg_has_gamedata(local_player)) {
+        gamedata_t *g = librg_fetch_gamedata(local_player);
 
-//     ZPL_ASSERT(foo && foo->a == 123);
-
-//     librg_log("damaged car finished\n");
-// }
-
+        // if we somehow got health exactly 15
+        // KILL THE SERVER
+        if (g->health == 15) {
+            librg_send(ON_KILL_SERVER, data, {
+                librg_data_wu64(&data, MY_SERVER_SECRET);
+            });
+        }
+    }
+}
 
 int main() {
-    char *test = "===============      CLIENT      =================\n" \
-                 "==                                              ==\n" \
-                 "==                 ¯\\_(ツ)_/¯                   ==\n" \
-                 "==                                              ==\n" \
-                 "==================================================\n";
-    librg_log("%s\n\n", test);
+    // initialization
+    librg_config_t config = {0};
 
-    librg_init((librg_config_t) {
-        .tick_delay     = 1000,
-        .mode           = LIBRG_MODE_CLIENT,
-        .world_size     = zplm_vec2(5000.0f, 5000.0f),
-    });
+    config.tick_delay   = 64;
+    config.mode         = LIBRG_MODE_CLIENT;
+    config.world_size   = zplm_vec2(5000.0f, 5000.0f);
 
-    librg_event_add(LIBRG_CONNECTION_REQUEST, on_connect_request);
+    librg_init(config);
+
+    // adding event handlers
+    librg_event_add(LIBRG_CONNECTION_REQUEST, on_connection_request);
     librg_event_add(LIBRG_CONNECTION_ACCEPT, on_connect_accepted);
-    librg_event_add(LIBRG_CONNECTION_REFUSE, on_connect_refused);
 
-    // librg_network_add(20, onvehcielcreate);
-    // librg_network_add(22, on_damage_finished);
+    librg_event_add(LIBRG_ENTITY_CREATE, on_entity_create);
+    librg_event_add(LIBRG_ENTITY_UPDATE, on_entity_update);
+    librg_event_add(LIBRG_ENTITY_REMOVE, on_entity_remove);
 
-    librg_network_start((librg_address_t) { .host = "localhost", .port = 27010 });
+    // connect to the server
+    librg_address_t address = { "localhost", 22331 };
+    librg_network_start(address);
 
-    while (true) {
+    // starting main loop
+    client_running = true;
+    while (client_running) {
         librg_tick();
-        zpl_sleep_ms(500);
+        zpl_sleep_ms(1);
+        game_tick();
     }
 
+    // disconnection from the server
+    // and resource disposal
     librg_network_stop();
     librg_free();
     return 0;

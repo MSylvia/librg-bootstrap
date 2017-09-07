@@ -1,0 +1,34 @@
+{
+  "name": "librg-bootstrap.c",
+  "version": "1.0.0",
+  "description": "librg cmake-powered ready-to-use example project",
+  "main": "src/server.c",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/librg/librg-bootstrap.git"
+  },
+  "keywords": [
+    "librg",
+    "c",
+    "cpp",
+    "mmo",
+    "networking",
+    "example",
+    "cmake",
+    "bootstrap",
+    "gamedev",
+    "zpl"
+  ],
+  "author": "Dominik Madarasz <zaklaus@outlook.com>",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/librg/librg-bootstrap/issues"
+  },
+  "homepage": "https://github.com/librg/librg-bootstrap#readme",
+  "dependencies": {
+    "librg.c": "^2.0.3"
+  }
+}

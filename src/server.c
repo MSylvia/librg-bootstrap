@@ -10,11 +10,16 @@ enum {
 
 /**
  * This sturcture defines our nice component
+ * (same as on the client)
  */
 typedef struct {
     u32 model;
     u32 health;
+
     b32 alive;
+
+    zplm_vec3_t direction;
+    zplm_vec3_t speed;
 } librg_component(gamedata);
 
 #define MY_SERVER_SECRET 23788787283782378
@@ -25,7 +30,7 @@ static b32 server_running;
  * we can disallow him to event join
  */
 void on_connection_request(librg_event_t *event) {
-    if (librg_data_ru64(&event->data) != MY_SERVER_SECRET) {
+    if (librg_data_ru64(event->data) != MY_SERVER_SECRET) {
         // reject him from joining the server
         librg_event_reject(event);
     }
@@ -50,6 +55,9 @@ void on_connect_accepted(librg_event_t *event) {
     gamedata->health    = 1000;
     gamedata->alive     = true;
 
+    gamedata->direction = zplm_vec3(0.0f, 0.0f, 0.0f);
+    gamedata->speed     = zplm_vec3(0.0f, 0.0f, 0.0f);
+
     // set the position
     transform->position = zplm_vec3(0.0f, 0.0f, 0.0f);
 
@@ -65,7 +73,7 @@ void on_connect_accepted(librg_event_t *event) {
  * we will send one big structure in a single message
  */
 void on_entity_create(librg_event_t *event) {
-    librg_data_wptr(&event->data, librg_fetch_gamedata(event->entity), sizeof(gamedata_t));
+    librg_data_wptr(event->data, librg_fetch_gamedata(event->entity), sizeof(gamedata_t));
 }
 
 /**
@@ -76,7 +84,7 @@ void on_entity_create(librg_event_t *event) {
  * (librg_transform_t will be sent always)
  */
 void on_entity_update(librg_event_t *event) {
-    librg_data_wu32(&event->data, librg_fetch_gamedata(event->entity)->health);
+    librg_data_wu32(event->data, librg_fetch_gamedata(event->entity)->health);
 }
 
 /**
@@ -84,7 +92,7 @@ void on_entity_update(librg_event_t *event) {
  * However it looks and works similary
  */
 void on_kill_server(librg_message_t *msg) {
-    if (librg_data_ru64(&msg->data) == MY_SERVER_SECRET) {
+    if (librg_data_ru64(msg->data) == MY_SERVER_SECRET) {
         server_running = false;
     }
 }
@@ -122,7 +130,7 @@ int main() {
     librg_network_start(address);
 
     // lets also spawn 250 bots :O
-    for (int i = 0; i < 250; ++i) {
+    for (int i = 0; i < 2500; ++i) {
         spawn_bot();
     }
 

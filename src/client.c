@@ -15,7 +15,11 @@ enum {
 typedef struct {
     u32 model;
     u32 health;
+
     b32 alive;
+
+    zplm_vec3_t direction;
+    zplm_vec3_t speed;
 } librg_component(gamedata);
 
 #define MY_SERVER_SECRET 23788787283782378
@@ -28,7 +32,7 @@ librg_entity_t local_player;
  * to the server
  */
 void on_connection_request(librg_event_t *event) {
-    librg_data_wu64(&event->data, MY_SERVER_SECRET);
+    librg_data_wu64(event->data, MY_SERVER_SECRET);
 }
 
 void on_connect_accepted(librg_event_t *event) {
@@ -53,7 +57,7 @@ void on_entity_create(librg_event_t *event) {
 
     // now read and attach server's gamedata about entity
     gamedata_t gamedata;
-    librg_data_rptr(&event->data, &gamedata, sizeof(gamedata_t));
+    librg_data_rptr(event->data, &gamedata, sizeof(gamedata_t));
     librg_attach_gamedata(event->entity, gamedata);
 }
 
@@ -71,7 +75,7 @@ void on_entity_update(librg_event_t *event) {
     );
 
     // read helth server sent us
-    u32 new_health = librg_data_ru32(&event->data);
+    u32 new_health = librg_data_ru32(event->data);
 
     // and assign it into our gamedata, if it's attached
     gamedata_t *gamedata = librg_fetch_gamedata(event->entity);

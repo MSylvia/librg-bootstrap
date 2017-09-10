@@ -29,6 +29,6 @@
   },
   "homepage": "https://github.com/librg/librg-bootstrap#readme",
   "dependencies": {
-    "librg.c": "^2.2.1"
+    "librg.c": "^2.2.2"
   }
 }

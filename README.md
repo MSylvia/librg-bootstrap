@@ -1,5 +1,4 @@
-# librg-bootstrap [![npm](https://img.shields.io/npm/v/librg-bootstrap.svg)](https://github.com/librg/librg-bootstrap/)
-
+# librg-bootstrap
 This is a ready-to-use bootstrap project to give a quickstart to librg freshmen.
 
 ## Setup

@@ -3,7 +3,7 @@
 #include <librg.h>
 
 enum {
-    ON_KILL_SERVER = LIBRG_LAST_ENUM_NUMBER, // we are counting from N events +1
+    ON_KILL_SERVER = LIBRG_EVENT_LAST, // we are counting from N events +1
     ON_OTHER_MSG_1,
     ON_OTHER_MSG_2,
 };
@@ -20,7 +20,7 @@ typedef struct {
 
     zplm_vec3_t direction;
     zplm_vec3_t speed;
-} librg_component(gamedata);
+} player_t;
 
 #define MY_SERVER_SECRET 23788787283782378
 static b32 server_running;
@@ -42,28 +42,26 @@ void on_connection_request(librg_event_t *event) {
  */
 void on_connect_accepted(librg_event_t *event) {
     librg_log("someone connected to the server!\n");
+    librg_entity_t *entity = event->entity;
 
-    // we have some default components already in place
-    librg_transform_t *transform = librg_fetch_transform(event->entity);
-    librg_client_t    *client    = librg_fetch_client(event->entity);
+    // attach some custom data
+    player_t *player = zpl_malloc(sizeof(player_t));
+    zpl_zero_item(player);
 
-    gamedata_t *gamedata = librg_attach_gamedata(
-        event->entity, (gamedata_t){0}
-    );
+    player->model     = 552;
+    player->health    = 1000;
+    player->alive     = true;
 
-    gamedata->model     = 552;
-    gamedata->health    = 1000;
-    gamedata->alive     = true;
-
-    gamedata->direction = zplm_vec3(0.0f, 0.0f, 0.0f);
-    gamedata->speed     = zplm_vec3(0.0f, 0.0f, 0.0f);
+    player->direction = zplm_vec3(0.0f, 0.0f, 0.0f);
+    player->speed     = zplm_vec3(0.0f, 0.0f, 0.0f);
 
     // set the position
-    transform->position = zplm_vec3(0.0f, 0.0f, 0.0f);
+    entity->position  = zplm_vec3(0.0f, 0.0f, 0.0f);
+    entity->user_data = (void *)player; /* save custom data inside */
 
     // and allow player to stream changes of his entity
     // he will be sending position changes and other stuff
-    librg_streamer_client_set(event->entity, client->peer);
+    librg_entity_control_set(event->ctx, entity->id, entity->client_peer);
 }
 
 /**
@@ -73,7 +71,8 @@ void on_connect_accepted(librg_event_t *event) {
  * we will send one big structure in a single message
  */
 void on_entity_create(librg_event_t *event) {
-    librg_data_wptr(event->data, librg_fetch_gamedata(event->entity), sizeof(gamedata_t));
+    player_t *player = (player_t *)event->entity->user_data;
+    librg_data_wptr(event->data, player, sizeof(player_t));
 }
 
 /**
@@ -81,10 +80,11 @@ void on_entity_create(librg_event_t *event) {
  * entity is inside the player stream zone
  *
  * We will be sending only u32 with health
- * (librg_transform_t will be sent always)
+ * (entity position will be sent always)
  */
 void on_entity_update(librg_event_t *event) {
-    librg_data_wu32(event->data, librg_fetch_gamedata(event->entity)->health);
+    player_t *player = (player_t *)event->entity->user_data;
+    librg_data_wu32(event->data, player->health);
 }
 
 /**
@@ -97,52 +97,56 @@ void on_kill_server(librg_message_t *msg) {
     }
 }
 
-void spawn_bot() {
-    librg_entity_t enemy = librg_entity_create(0);
-    librg_attach_gamedata(enemy, (gamedata_t){0});
+void spawn_bot(librg_ctx_t *ctx) {
+    librg_entity_id enemyid = librg_entity_create(ctx, 0);
+    librg_entity_t *enemy   = librg_entity_fetch(ctx, enemyid);
 
-    librg_transform_t *transform = librg_fetch_transform(enemy);
-    transform->position.x = (float)(2000 - rand() % 4000);
-    transform->position.y = (float)(2000 - rand() % 4000);
+    player_t *player = zpl_malloc(sizeof(player_t));
+    zpl_zero_item(player);
+
+    enemy->user_data = player;
+
+    enemy->position.x = (float)(2000 - rand() % 4000);
+    enemy->position.y = (float)(2000 - rand() % 4000);
 }
 
 int main() {
     // initialization
-    librg_config_t config = {0};
+    librg_ctx_t ctx = {0};
 
-    config.tick_delay   = 32; // 32ms delay, is around 30hz, quite fast
-    config.mode         = LIBRG_MODE_SERVER;
-    config.world_size   = zplm_vec2(5000.0f, 5000.0f);
+    ctx.tick_delay   = 32; // 32ms delay, is around 30hz, quite fast
+    ctx.mode         = LIBRG_MODE_SERVER;
+    ctx.world_size   = zplm_vec3(5000.0f, 5000.0f, 5000.0f);
 
-    librg_init(config);
+    librg_init(&ctx);
 
     // adding event handlers
-    librg_event_add(LIBRG_CONNECTION_REQUEST, on_connection_request);
-    librg_event_add(LIBRG_CONNECTION_ACCEPT, on_connect_accepted);
+    librg_event_add(&ctx, LIBRG_CONNECTION_REQUEST, on_connection_request);
+    librg_event_add(&ctx, LIBRG_CONNECTION_ACCEPT, on_connect_accepted);
 
-    librg_event_add(LIBRG_ENTITY_CREATE, on_entity_create);
-    librg_event_add(LIBRG_ENTITY_UPDATE, on_entity_update);
+    librg_event_add(&ctx, LIBRG_ENTITY_CREATE, on_entity_create);
+    librg_event_add(&ctx, LIBRG_ENTITY_UPDATE, on_entity_update);
 
-    librg_network_add(ON_KILL_SERVER, on_kill_server);
+    librg_network_add(&ctx, ON_KILL_SERVER, on_kill_server);
 
     // starting server
     librg_address_t address = {0}; address.port = 22331;
-    librg_network_start(address);
+    librg_network_start(&ctx, address);
 
     // lets also spawn 250 bots :O
     for (int i = 0; i < 2500; ++i) {
-        spawn_bot();
+        spawn_bot(&ctx);
     }
 
     // starting main loop
     server_running = true;
     while (server_running) {
-        librg_tick();
+        librg_tick(&ctx);
         zpl_sleep_ms(1);
     }
 
     // stopping network and resources disposal
-    librg_network_stop();
-    librg_free();
+    librg_network_stop(&ctx);
+    librg_free(&ctx);
     return 0;
 }

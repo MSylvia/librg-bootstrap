@@ -1,6 +1,6 @@
 {
   "name": "librg-bootstrap.c",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "librg cmake-powered ready-to-use example project",
   "main": "src/server.c",
   "scripts": {
@@ -29,6 +29,6 @@
   },
   "homepage": "https://github.com/librg/librg-bootstrap#readme",
   "dependencies": {
-    "librg.c": "^3.0.0"
+    "librg.c": "^3.0.1"
   }
 }

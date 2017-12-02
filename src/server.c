@@ -98,14 +98,12 @@ void on_kill_server(librg_message_t *msg) {
 }
 
 void spawn_bot(librg_ctx_t *ctx) {
-    librg_entity_id enemyid = librg_entity_create(ctx, 0);
-    librg_entity_t *enemy   = librg_entity_fetch(ctx, enemyid);
+    librg_entity_t *enemy = librg_entity_create(ctx, 0);
 
     player_t *player = zpl_malloc(sizeof(player_t));
     zpl_zero_item(player);
 
     enemy->user_data = player;
-
     enemy->position.x = (float)(2000 - rand() % 4000);
     enemy->position.y = (float)(2000 - rand() % 4000);
 }
